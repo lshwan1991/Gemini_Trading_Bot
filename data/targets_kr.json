@@ -1,0 +1,82 @@
+[
+    {
+        "code": "005930",
+        "name": "삼성전자",
+        "market": "KR",
+        "target_ratio": 0.2,
+        "strategy": "MACD_RSI_OPTIMIZED",
+        "setting": { "rsi_buy": 43, "rsi_sell": 75 }
+    },
+    {
+        "code": "252670",
+        "name": "KODEX200인버스2배",
+        "market": "KR",
+        "target_ratio": 0.0,
+        "strategy": "SMART_MOMENTUM",
+        "setting": { "k": 0.7 }
+    },
+    {
+        "code": "114800",
+        "name": "KODEX_인버스1배",
+        "market": "KR",
+        "target_ratio": 0.2,
+        "strategy": "SMART_MOMENTUM",
+        "setting": { "k": 0.7 }
+    },
+    {
+        "code": "122630",
+        "name": "KODEX레버리지2배",
+        "market": "KR",
+        "target_ratio": 0.2,
+        "strategy": "SMART_MOMENTUM",
+        "setting": { "k": 0.7 }
+    },
+    {
+        "code": "107640",
+        "name": "한중엔시에스",
+        "market": "KR",
+        "target_ratio": 0.15,
+        "strategy": "SMART_MOMENTUM",
+        "setting": { "k": 0.6 }
+    },
+    {
+        "code": "017960",
+        "name": "한국카본",
+        "market": "KR",
+        "target_ratio": 0.1,
+        "strategy": "SMART_MOMENTUM",
+        "setting": { "k": 0.6 }
+    },
+        {
+        "code": "144510",
+        "name": "지씨셀",
+        "market": "KR",
+        "target_ratio": 0.05,
+        "strategy": "SMART_MOMENTUM",
+        "setting": { "k": 0.7 }
+    },
+    {
+        "code": "196170",
+        "name": "알테오젠",
+        "market": "KR",
+        "target_ratio": 0.0,
+        "strategy": "SMART_MOMENTUM",
+        "setting": { "k": 0.7 }
+    },
+    {
+        "code": "042660",
+        "name": "한화오션",
+        "market": "KR",
+        "target_ratio": 0.0,
+        "strategy": "MACD_RSI_OPTIMIZED",
+        "setting": { "k": 0.7 }
+    },
+    {
+        "code": "000660",
+        "name": "SK하이닉스",
+        "market": "KR",
+        "target_ratio": 0.0,
+        "strategy": "MACD_RSI_OPTIMIZED",
+        "setting": { "k": 0.7 }
+    }
+]

@@ -1,0 +1,38 @@
+[
+    {
+        "code": "TQQQ",
+        "name": "나스닥3배",
+        "market": "US",
+        "exchange": "NASD",
+        "target_ratio": 0.3,
+        "strategy": "SMART_MOMENTUM",  
+        "setting": { "k": 0.5 }
+    },
+    {
+        "code": "SOXL",
+        "name": "반도체3배",
+        "market": "US",
+        "exchange": "AMEX", 
+        "target_ratio": 0.2,
+        "strategy": "SMART_MOMENTUM",
+        "setting": { "k": 0.5 }
+    },
+        {
+        "code": "JPM",
+        "name": "제이피모건",
+        "market": "US",
+        "exchange": "NYSE",
+        "target_ratio": 0.2,
+        "strategy": "SMART_MOMENTUM",
+        "setting": { "k": 0.5 }
+    },
+        {
+        "code": "GOOG",
+        "name": "알파벳",
+        "market": "US",
+        "exchange": "NASD",
+        "target_ratio": 0.2,
+        "strategy": "SMART_MOMENTUM",
+        "setting": { "k": 0.5 }
+    }
+]

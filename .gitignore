@@ -1,1 +1,24 @@
+
+# 보안 및 환경설정 (필수)
 .env
+.env.local
+*.key
+*.pem
+secrets.json
+token_save.json
+.csv
+
+# 의존성 폴더 (용량 큼)
+node_modules/
+venv/
+.venv/
+
+
+# 에디터 설정
+.vscode/
+.idea/
+
+# 빌드 결과물 및 로그
+dist/
+build/
+*.log

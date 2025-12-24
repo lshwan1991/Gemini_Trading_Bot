@@ -17,6 +17,7 @@ venv/
 # 에디터 설정
 .vscode/
 .idea/
+.__pycache__/
 
 # 빌드 결과물 및 로그
 dist/

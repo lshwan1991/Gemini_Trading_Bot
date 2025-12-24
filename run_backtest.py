@@ -90,8 +90,8 @@ PORTFOLIO = {
     "005930": {"name": "삼성전자", "strategy": "MACD_RSI_OPTIMIZED", "ratio": 0.2, "rsi_sell": 75},
     
     # [ETF: SMART_MOMENTUM]
-    "252670": {"name": "인버스2X", "strategy": "SMART_MOMENTUM", "ratio": 0.2, "k": 0.7},
-    "122630": {"name": "레버리지", "strategy": "SMART_MOMENTUM", "ratio": 0.2, "k": 0.7},
+    "252670": {"name": "인버스2X", "strategy": "SMART_MOMENTUM", "ratio": 0.05, "k": 0.4},
+    "122630": {"name": "레버리지", "strategy": "SMART_MOMENTUM", "ratio": 0.05, "k": 0.4},
     
     # [중소형주: SMART_MOMENTUM]
     "107640": {"name": "한중엔시에스", "strategy": "SMART_MOMENTUM", "ratio": 0.2, "k": 0.7},

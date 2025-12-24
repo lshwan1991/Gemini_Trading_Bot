@@ -2,13 +2,14 @@ import requests
 import os
 import json
 import time
+from datetime import datetime
 from config import Config
 from src.traders.base_trader import BaseTrader
 from src.data_manager import load_target_stocks
 from src.strategy import get_signal # 👈 전략 함수 가져오기
 from src.telegram_bot import send_telegram_msg
 import csv
-from datetime import datetime
+
 
 
 class KoreaTrader(BaseTrader):
@@ -428,7 +429,7 @@ class KoreaTrader(BaseTrader):
             # 지표 계산
             df = self.calculate_indicators(raw_data)
             if df.empty: continue
-            
+
             curr, prev = df.iloc[-1], df.iloc[-2]
             current_price = int(curr['Close'])
             

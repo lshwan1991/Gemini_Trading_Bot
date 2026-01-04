@@ -1,4 +1,6 @@
 import pandas as pd
+from datetime import datetime
+import pytz
 
 def strat_macd_rsi(curr, prev, setting):
     """
@@ -63,6 +65,97 @@ def strat_macd_rsi_optimized(curr, prev, setting):
 
     return 'none', '', 0
 
+def strat_lw_ad_hybrid(curr, prev, setting):
+    """
+    🆕 [신규 전략] 래리 윌리엄스 변동성 돌파 + A/D Line 필터
+    - 변동성 돌파 시그널이 나와도, 세력 매집(A/D 상승)이 없으면 무시함
+    - 가짜 돌파(Fake Breakout)를 걸러내는 것이 목적
+    """
+    # 0. 데이터 검증 (A/D 계산값 존재 여부)
+    if 'AD' not in curr or 'AD_MA20' not in curr:
+        return 'none', 'AD_데이터_없음', 0
+    if pd.isna(curr['AD']) or pd.isna(curr['AD_MA20']):
+        return 'none', 'AD_계산불가', 0
+
+    k = setting.get('k', 0.5)
+
+    # ✅ [설정] 시장 구분 (기본값 KR)
+    market_type = setting.get('market', 'KR')
+
+    # 1. 현재 시간 확인 (한국 시간)
+    now = datetime.now(pytz.timezone('Asia/Seoul'))
+    hm = int(now.strftime("%H%M"))
+
+    # 변수 초기화 (매도 시간, 진입 허용 시간)
+    is_sell_time = False
+    is_wait_time = False
+    
+
+    # -----------------------------------------------------------
+    # 🇰🇷 [한국 시장] 시간표 (09:00 ~ 15:30)
+    # -----------------------------------------------------------
+    if market_type == 'KR':
+        # 1. 시가 청산 (09:00 ~ 09:10)
+        if 900 <= hm <= 910:
+            is_sell_time = True
+            
+        # 2. 오전 관망 (09:11 ~ 12:30) - 휩소 방지
+        elif hm < 1230:
+            is_wait_time = True
+
+    # -----------------------------------------------------------
+    # 🇺🇸 [미국 시장] 시간표 (23:30 ~ 06:00)
+    # -----------------------------------------------------------
+    # 매도 시간을 넉넉하게 잡고, 진입 시간을 01:30(새벽) 이후로 설정
+    else:
+        # 1. 시가 청산 (22:30 ~ 23:50)
+        # 장 시작하자마자 파는 구간 (썸머/윈터 모두 포함)
+        if 2330 <= hm <= 2359: 
+            is_sell_time = True
+            
+        # 2. 초반 관망 (00:00 ~ 01:30) - 미국장 초반 변동성 회피
+        # 자정이 넘어가면 hm이 0부터 시작하므로 조건이 달라짐
+        # (예: 22시, 23시 혹은 00시, 01시 30분 전이면 대기)
+        elif (2200 <= hm < 2330) or (0 <= hm < 130): 
+            is_wait_time = True
+
+    # ===========================================================
+    # 🚦 [판단] 로직 수행
+    # ===========================================================
+    
+    # 1. [매도] 시가 청산 타임이면 무조건 매도
+    if is_sell_time:
+        return 'sell', f"시가청산({market_type}_Open)", 0
+
+    # 2. [대기] 관망 타임이면 진입 금지
+    if is_wait_time:
+        return 'none', f"{market_type}_변동성_관망중", 0
+
+    # 3. [진입] 진짜 추세 확인 후 진입
+    # KR: 12:30 이후 / US: 01:30 이후
+    target_price = curr['Open'] + (curr['Range'] * k)
+    current_price = curr['Close']
+    is_ad_bullish = curr['AD'] > curr['AD_MA20']
+
+    # 🟢 [매수]
+    if current_price >= target_price:
+        if is_ad_bullish:
+             return 'buy', f"추세확인_돌파(k={k})", 0
+        else:
+            # 돌파는 했으나 A/D가 꺾여있음 -> 매수 안 함
+            return 'none', '', 0
+
+    # 🔴 [손절] 방어 로직
+    if current_price < curr['Open']:
+        return 'sell', "시가이탈_손절", 0
+    
+    current_rsi = curr['RSI'] if 'RSI' in curr and not pd.isna(curr['RSI']) else 50
+    if current_rsi > 85:
+        return 'sell', f"RSI초과열({current_rsi:.0f})_익절", 0
+
+    return 'none', '', 0
+
+
 def strat_volatility_breakout(curr, prev, setting):
     """
     [전략] 변동성 돌파 (한국 테마 및 주도주)
@@ -86,7 +179,6 @@ def strat_volatility_breakout(curr, prev, setting):
 def strat_smart_momentum(curr, prev, setting):
     """
     [전략] 스마트 모멘텀 (Final: 추세 추종 강화 + 휩소 방어)
-    - 백테스트 검증 완료: 연수익 약 16% / MDD -21%
     """
     # 0. 데이터 검증
     if pd.isna(curr['SMA20']) or pd.isna(curr['Range']) or pd.isna(curr['Open']):
@@ -119,15 +211,11 @@ def strat_smart_momentum(curr, prev, setting):
     # -----------------------------------------------------------
     
     # 1. RSI 과열 익절 (기준 85로 상향 -> 더 비쌀 때 팜)
-    # (RSI 데이터가 없을 경우 안전하게 50으로 처리)
     current_rsi = curr['RSI'] if 'RSI' in curr and not pd.isna(curr['RSI']) else 50
     if current_rsi > 85:
         return 'sell', f"RSI초과열({current_rsi:.0f})_익절", 0
-
-    # 2. [삭제됨] SMA5 트레일링 스톱 
-    # (너무 일찍 팔아서 수익을 못 먹는 문제 해결 -> 삭제)
-
-    # 3. 20일선 이탈 (Buffer 1% 적용 -> 휩소 방어)
+    
+    # 2. 20일선 이탈 (Buffer 1% 적용 -> 휩소 방어)
     sma20_buffer = curr['SMA20'] * 0.99
     if current_price < sma20_buffer:
         return 'sell', "추세이탈(SMA20)_매도", 0
@@ -139,15 +227,21 @@ def get_signal(strategy_name, curr, prev, setting):
     [Dispatcher] 전략 이름에 따라 알맞은 함수 호출
     :return: (Signal, Reason, Qty) -> Qty는 Trader 클래스에서 자금사정에 맞춰 계산하므로 여기선 0 리턴
     """
+    # 1. 변동성 돌파 (기본)
     if strategy_name == "VOLATILITY_BREAKOUT":
         return strat_volatility_breakout(curr, prev, setting)
     
-    # 👇 새로 추가된 전략 연결
+    # 2. 스마트 모멘텀 (노이즈 필터)
     if strategy_name == "SMART_MOMENTUM":
         return strat_smart_momentum(curr, prev, setting)
     
-    # 👇 [추가] 대형주 전용 전략 연결
+    # 3. MACD + RSI + SMA60 (대형주)
     if strategy_name == "MACD_RSI_OPTIMIZED":
         return strat_macd_rsi_optimized(curr, prev, setting)
     
+    # 🆕 4. LW + AD Hybrid (신규 추가)
+    if strategy_name == "LW_AD_HYBRID":
+        return strat_lw_ad_hybrid(curr, prev, setting)
+    
+    # 기본: MACD + RSI
     return strat_macd_rsi(curr, prev, setting)

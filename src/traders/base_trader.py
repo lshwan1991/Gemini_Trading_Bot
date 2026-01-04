@@ -1,11 +1,31 @@
+import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 import pandas as pd
 import time
 from abc import ABC, abstractmethod
+import numpy as np
 
 class BaseTrader(ABC):
     def __init__(self, auth_manager):
         self.auth_manager = auth_manager
-        self.token = None
+        # 자식 클래스(KoreaTrader, USTrader)가 이 변수들을 사용합니다.
+        self.app_key = auth_manager.app_key
+        self.app_secret = auth_manager.app_secret
+        self.url_base = auth_manager.url_base
+        self.account_no = auth_manager.account_no
+        self.mode = auth_manager.mode
+
+        # 토큰 초기화
+        self.token = self.auth_manager.get_token()
+
+        # ✅ [핵심] 차트 데이터 캐싱 및 타이머 추가
+        self.market_data_cache = {}  # { 'CODE': DataFrame }
+        self.last_chart_update_time = 0 # 마지막으로 일봉을 갱신한 시간
+        self.CHART_REFRESH_INTERVAL = 600 # 10분 (600초)
+
+        # ✅ [네트워크] 강력한 재시도 세션 생성
+        self.session = self._create_retry_session()
     
     def refresh_token(self):
         self.token = self.auth_manager.get_token()
@@ -19,16 +39,44 @@ class BaseTrader(ABC):
         pass
 
     @abstractmethod
+    def get_current_price(self, code):
+        """[NEW] 현재가 조회 (가벼운 API)"""
+        pass
+
+    @abstractmethod
     def send_order(self, code, side, price, qty):
         pass
 
-    def calculate_indicators(self, data_list):
+    @abstractmethod
+    def run(self):
+        pass
+
+    def _create_retry_session(self, retries=1, backoff_factor=0.1):
+        """
+        네트워크 불안정 시 지수 백오프(Exponential Backoff)로 재시도하는 세션 생성
+        - retries: 최대 재시도 횟수
+        - backoff_factor: 재시도 간격 (0.3초, 0.6초, 1.2초... 늘어남)
+        """
+        session = requests.Session()
+        retry = Retry(
+            total=retries,
+            read=retries,
+            connect=retries,
+            backoff_factor=backoff_factor,
+            status_forcelist=[500, 502, 503, 504], # 서버 에러 시 재시도
+            allowed_methods=["GET", "POST"] # 모든 요청에 적용
+        )
+        adapter = HTTPAdapter(max_retries=retry)
+        session.mount("https://", adapter)
+        session.mount("http://", adapter)
+        return session
+
+    def calculate_indicators(self, data):
         """지표 계산 (MACD, RSI, 변동성, +이동평균선)"""
         # 데이터가 너무 적으면(20일 미만) 이평선 계산 불가하므로 빈 DF 리턴
-        if not data_list or len(data_list) < 20: 
-            return pd.DataFrame()
+        if not data: return pd.DataFrame()
         
-        df = pd.DataFrame(data_list)
+        df = pd.DataFrame(data)
         
         # 날짜 오름차순 정렬 (과거 -> 오늘)
         if df.iloc[0]['Date'] > df.iloc[-1]['Date']:
@@ -41,37 +89,46 @@ class BaseTrader(ABC):
         df['SMA20'] = df['Close'].rolling(window=20).mean()
         df['SMA60'] = df['Close'].rolling(window=60).mean()
         
-        # ---------------------------------------------------------
-        # 🆕 [NEW] 노이즈 비율 계산 (동적 K 만들기)
-        # ---------------------------------------------------------
-        # 공식: 1 - (|시가-종가| / (고가-저가))
-        # (고가-저가)가 0인 경우(거래정지 등) 0으로 처리하여 에러 방지
+        # 2. 노이즈 비율 계산 (동적 K)
         range_size = df['High'] - df['Low']
         body_size = (df['Open'] - df['Close']).abs()
-        
-        # 노이즈 = 1 - (몸통 / 전체길이)
-        # 꼬리가 길수록 1에 가깝고, 몸통이 꽉 찰수록 0에 가깝음
+        safe_range = range_size.replace(0, 1)
         df['Noise'] = 1 - (body_size / range_size.replace(0, 1)) 
-        
-        # 최근 20일 평균 노이즈를 'k' 값으로 사용
         df['NoiseMA20'] = df['Noise'].rolling(window=20).mean()
-        # ---------------------------------------------------------
 
-
-        # 2. MACD
+        # 3. MACD
         df['EMA12'] = df['Close'].ewm(span=12).mean()
         df['EMA26'] = df['Close'].ewm(span=26).mean()
         df['MACD'] = df['EMA12'] - df['EMA26']
         df['Signal'] = df['MACD'].ewm(span=9).mean()
         
-        # 3. RSI
+        # 4. RSI
         delta = df['Close'].diff(1)
         gain = delta.where(delta > 0, 0)
         loss = -delta.where(delta < 0, 0)
-        rs = gain.rolling(14).mean() / loss.rolling(14).mean()
+        rs = gain.rolling(14).mean() / loss.rolling(14).mean().replace(0, 1) # div 0 방지
         df['RSI'] = 100 - (100 / (1 + rs))
         
-        # 4. 변동성 (Range)
+        # 5. 변동성 (Range)
         df['Range'] = df['High'].shift(1) - df['Low'].shift(1)
+
+        # ✅ [수정] A/D Line 직접 계산
+        # 고가-저가가 0인 경우(변동 없음) 1로 대체하여 에러 방지
+        hl_range = df['High'] - df['Low']
+        hl_range = hl_range.replace(0, 1) 
+        
+        mfm = ((df['Close'] - df['Low']) - (df['High'] - df['Close'])) / hl_range
+        mfv = mfm * df['Volume']
+        
+        # A/D Line = MFV의 누적 합계
+        df['AD'] = mfv.cumsum()
+        
+        # A/D Line의 20일 이동평균 (추세 판단용)
+        df['AD_MA20'] = df['AD'].rolling(window=20).mean()
+        
+        # NaN 값 처리 (앞쪽 데이터 채우기 + 0 처리)
+        df.bfill(inplace=True)
+        df.fillna(0, inplace=True)
+
         
         return df

@@ -7,36 +7,43 @@ load_dotenv()
 
 class Config:
     # ==========================================
-    # 🎮 모드 설정 (여기만 바꾸면 됩니다!)
-    # 'PAPER' : 모의투자 / 'REAL' : 실전투자
+    # 🇰🇷 한국투자증권 설정 (KR: 실전투자)
     # ==========================================
-    MODE = 'PAPER' 
+    KR_MODE = "REAL"  # 한국은 고정
+    print(f"🚀 [모드] 한국 시장 - 실전투자(REAL) 환경으로 시작합니다.")
+    KR_APP_KEY = os.getenv("KI_APP_KEY")
+    KR_APP_SECRET = os.getenv("KI_APP_SECRET")
+    KR_URL_BASE = os.getenv("KI_BASE_URL")
+    KR_ACCOUNT_NO = os.getenv("KI_ACCOUNT_NO")
+
     # ==========================================
+    # 🇺🇸 미국주식 설정 (US: 실전투자)
+    # ==========================================
+    US_MODE = "REAL"   # 미국은 실전투자 고정
+    print(f"🚨 [주의] 미국 시장 - 실전투자(REAL) 환경으로 시작합니다.")
+    # 실전 투자는 보통 .env의 KI_ (Korea Investment) 변수를 사용합니다.
+    # .env 파일에 KI_APP_KEY 등이 있는지 꼭 확인하세요!
+    US_APP_KEY = os.getenv("KI_APP_KEY")
+    US_APP_SECRET = os.getenv("KI_APP_SECRET")
+    US_URL_BASE = os.getenv("KI_BASE_URL")
+    US_ACCOUNT_NO = os.getenv("KI_ACCOUNT_NO")
+
 
     # 공통 설정 (계좌번호, ID 등) 
     ACNT_PRDT_CD = os.getenv("my_prod")          # 계좌번호 뒤 2자리 (보통 01)
     HTS_ID = os.getenv("my_htsid")               # HTS ID
     USER_AGENT = os.getenv("my_agent")           # User-Agent
 
-    # 모드에 따라 키와 URL을 자동으로 선택하는 로직
-    if MODE == 'PAPER':
-        print(f"🚀 [모드] 모의투자(PAPER) 환경으로 시작합니다.")
-        APP_KEY = os.getenv("paper_APP_KEY")
-        APP_SECRET = os.getenv("paper_APP_SECRET")
-        URL_BASE = os.getenv("paper_BASE_URL")
-        ACCOUNT_NO = os.getenv("paper_ACCOUNT_NO") # 계좌번호 앞 8자리 (모의)
-    else:
-        print(f"🚨 [주의] 실전투자(REAL) 환경으로 시작합니다.")
-        APP_KEY = os.getenv("KI_APP_KEY")
-        APP_SECRET = os.getenv("KI_APP_SECRET")
-        URL_BASE = os.getenv("KI_BASE_URL")
-        ACCOUNT_NO = os.getenv("KI_ACCOUNT_NO") # 계좌번호 앞 8자리 (실전)
-
     # 필수값 체크 (키가 비어있으면 에러 발생)
-    if not APP_KEY or not APP_SECRET:
-        raise ValueError(f"❌ Error: {MODE} 모드의 APP_KEY 또는 APP_SECRET이 .env에 없습니다.")
+    if not KR_APP_KEY or not KR_APP_SECRET:
+        print("⚠️ [Warning] 한국(모의) 투자 키가 .env에 없습니다.")
     
+    if not US_APP_KEY or not US_APP_SECRET:
+        print("⚠️ [Warning] 미국(실전) 투자 키가 .env에 없습니다. (KI_... 변수 확인)")
 
     # 텔레그램 설정
     TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
     TELEGRAM_ID = os.getenv("TELEGRAM_ID")
+
+    # 최소 현금 비율 (0.01 = 1%)
+    MIN_CASH_RATIO = 0.01

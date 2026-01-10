@@ -6,6 +6,8 @@
 *.pem
 secrets.json
 token_save.json
+token_real.json
+token_paper.json
 .csv
 
 # 의존성 폴더 (용량 큼)

@@ -29,7 +29,7 @@
         "market": "KR",
         "target_ratio": 0.10,
         "strategy": "SMART_MOMENTUM",
-        "setting": { "k": 0.55 }
+        "setting": { "k": 0.6 }
     },
     {
         "code": "252670",
@@ -38,14 +38,6 @@
         "target_ratio": 0.00,
         "strategy": "SMART_MOMENTUM",
         "setting": { "k": 0.7 }
-    },
-    {
-        "code": "114800",
-        "name": "KODEX_인버스1배",
-        "market": "KR",
-        "target_ratio": 0.00,
-        "strategy": "SMART_MOMENTUM",
-        "setting": { "k": 0.55 }
     },
     {
         "code": "122630",

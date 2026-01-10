@@ -437,12 +437,19 @@ class USTrader(BaseTrader):
         msg += "-" * 30 + "\n"
         
         # 3. 보유 종목 리스팅
+        has_stock = False
         if details:
             # 평가금액 순 정렬
             sorted_codes = sorted(details.keys(), key=lambda x: details[x]['eval_amt'], reverse=True)
             
             for code in sorted_codes:
                 info = details[code]
+
+                # ✅ [수정] 수량이 0 이거나 음수인 종목(판 종목)은 리포트에서 제외!
+                if info['qty'] <= 0:
+                    continue
+
+                has_stock = True
                 
                 # 목표 비중 찾기
                 target_ratio = 0
@@ -464,6 +471,10 @@ class USTrader(BaseTrader):
                 msg += f"   • 단가: ${info['avg_price']:,.2f} → ${info['curr_price']:,.2f}\n"
                 msg += f"   • 비중: {current_ratio:.1f}% (목표 {target_ratio_pct:.0f}%)\n"
                 msg += "-" * 30 + "\n"
+        
+        if not has_stock:
+            msg += "💤 현재 보유 중인 종목이 없습니다.\n"
+        
         else:
             msg += "💤 보유 중인 미국 주식이 없습니다.\n"
         
@@ -578,7 +589,7 @@ class USTrader(BaseTrader):
         investable_cash = total_cash - locked_cash - min_cash_needed
         if investable_cash < 0: investable_cash = 0
 
-        # ✅ [Log] 포트폴리오 비중 콘솔 출력
+        # ✅ [포트폴리오 비중 콘솔 출력
         self.print_portfolio_log(total_asset, details, targets)
         print(f"\n💰 [Money] 보유: ${total_cash:,.2f} | 대기: ${locked_cash:,.2f} | 가용: ${investable_cash:,.2f}")
 
@@ -590,7 +601,9 @@ class USTrader(BaseTrader):
 
             # [Step 1] 현재가 확인 (리밸런싱용)
             curr_price = self.get_current_price(code, exchange)
-            if not curr_price: continue
+            if not curr_price: 
+                print(f"   ⚠️ {code} 현재가 조회 실패")
+                continue
 
             # [Step 2] 리밸런싱 (Rebalancing)
             qty_held = holdings.get(code, 0)
@@ -603,6 +616,7 @@ class USTrader(BaseTrader):
                 
                 if sell_qty > 0:
                     print(f"   ⚖️ [Rebalance] {t['name']} 비중 초과 -> {sell_qty}주 매도")
+                    send_telegram_msg(f"매도 주문...[Rebalance] {t['name']} 비중 초과 Start")
                     odno = self.send_order(code, 'SELL', curr_price, sell_qty, exchange)
                     if odno == 'HOLIDAY':
                         print("   🛑 [Stop] 휴장일이므로 미국장 매매를 오늘 중단합니다.")
@@ -613,6 +627,7 @@ class USTrader(BaseTrader):
                         self.pending_orders.append({'odno': odno, 'code': code, 'name': t['name'], 'type': 'SELL', 'qty': sell_qty, 'amt': 0, 'time': time.time()})
                         investable_cash += (sell_qty * curr_price) # 현금 확보 반영
                         time.sleep(0.2)
+                    send_telegram_msg(f"매도 주문...[Rebalance] {t['name']} 비중 초과 End")
                     continue
             
             # [Step 3] 차트 데이터 확인
@@ -631,6 +646,9 @@ class USTrader(BaseTrader):
             # 신호 판단
             signal, reason, _ = get_signal(t.get('strategy'), df.iloc[-1], df.iloc[-2], t.get('setting'))
 
+            current_rsi = df.iloc[-1].get('RSI', 0)
+            print(f"   🧐 [Check] {t['name']}({code}): ${curr_price} | RSI: {current_rsi:.1f} | Signal: {signal} ({reason})")
+
             # ------------------------------------------------------------------
             # [B] 매수 로직 (Buy)
             # ------------------------------------------------------------------
@@ -641,6 +659,7 @@ class USTrader(BaseTrader):
                 
                 if qty > 0:
                     print(f"   ⚡ [Buy Signal] {t['name']} {qty}주")
+                    send_telegram_msg(f"매수 주문...[Buy Signal]{t['name']} 비중 초과 Start")
                     odno = self.send_order(code, 'BUY', curr_price, qty, exchange)
                     if odno == 'HOLIDAY':
                         print("   🛑 [Stop] 휴장일이므로 미국장 매매를 오늘 중단합니다.")
@@ -651,12 +670,14 @@ class USTrader(BaseTrader):
                         self.pending_orders.append({'odno': odno, 'code': code, 'name': t['name'], 'type': 'BUY', 'qty': qty, 'price': curr_price, 'amt': qty*curr_price, 'time': time.time()})
                         investable_cash -= (qty * curr_price)
                         time.sleep(0.5)
+                    send_telegram_msg(f"매수 주문...[Buy Signal]{t['name']} 비중 초과 End")
             
             # ------------------------------------------------------------------
             # [C] 매도 로직 (Sell)
             # ------------------------------------------------------------------
             elif signal == 'sell' and qty_held > 0:
                 print(f"   ⚡ [Sell Signal] {t['name']} {qty_held}주")
+                send_telegram_msg(f"매도 주문...[Sell Signal]{t['name']}  Start")
                 odno = self.send_order(code, 'SELL', curr_price, qty_held, exchange)
                 if odno == 'HOLIDAY':
                     print("   🛑 [Stop] 휴장일이므로 미국장 매매를 오늘 중단합니다.")
@@ -666,6 +687,7 @@ class USTrader(BaseTrader):
                      send_telegram_msg(f"💧 [매도 접수] {t['name']} {qty_held}주 (전량)\n이유: {reason}")
                      self.pending_orders.append({'odno': odno, 'code': code, 'name': t['name'], 'type': 'SELL', 'qty': qty_held, 'amt': 0, 'time': time.time()})
                      time.sleep(0.5)
+                send_telegram_msg(f"매도 주문...[Sell Signal]{t['name']}  End")
           
         time.sleep(0.5)
         return "NORMAL"

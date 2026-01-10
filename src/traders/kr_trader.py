@@ -64,7 +64,7 @@ class KoreaTrader(BaseTrader):
                         "CTX_AREA_FK": ""}
                     
                     # ✅ 세션 사용 (timeout 적용)
-                    res = self.session.get(f"{self.url_base}{path}", headers=headers, params=params, timeout=2)
+                    res = self.session.get(f"{self.url_base}{path}", headers=headers, params=params, timeout=5)
                     data = res.json()
                     
                     if res.status_code == 200 and data['rt_cd'] == '0':
@@ -132,7 +132,7 @@ class KoreaTrader(BaseTrader):
             }
 
         try:
-            res = self.session.get(f"{self.url_base}{path}", headers=headers, params=params, timeout=2)
+            res = self.session.get(f"{self.url_base}{path}", headers=headers, params=params, timeout=5)
             data = res.json()
 
             if data['rt_cd'] != '0':
@@ -144,12 +144,12 @@ class KoreaTrader(BaseTrader):
                 out2 = data['output2'][0] # 계좌 합계
                 
                 # 1. 계좌 요약 데이터 파싱               
-                total_cash = float(out2.get('dnca_tot_amt', 0)) # 예수금
+                total_cash = float(out2.get('prvs_rcdl_excc_amt', 0)) # 2일 후 예수금
                 total_asset = float(out2.get('tot_evlu_amt', 0)) # 주식 총 평가금
 
                 # 실현손익 등 요약 정보
                 balance_summary = {
-                    "realized_profit": float(out2.get('rlzt_pfls_amt', 0)), # 모의는 없을 수 있음
+                    "realized_profit": float(out2.get('rlzt_pfls', 0)), # 모의는 없을 수 있음
                     "eval_profit": float(out2.get('evlu_pfls_smtl_amt', 0)),
                     "total_asset": total_asset,
                     "deposit": total_cash
@@ -260,7 +260,7 @@ class KoreaTrader(BaseTrader):
         params = {"fid_cond_mrkt_div_code": "J", 
                   "fid_input_iscd": code}
         try:
-            res = self.session.get(f"{self.url_base}{path}", headers=headers, params=params, timeout=2)
+            res = self.session.get(f"{self.url_base}{path}", headers=headers, params=params, timeout=5)
             if res.status_code == 200 and res.json()['rt_cd'] == '0':
                 return int(res.json()['output']['stck_prpr'])
         except Exception as e:
@@ -284,7 +284,7 @@ class KoreaTrader(BaseTrader):
             "fid_period_div_code": "D"
         }
         try:
-            res = self.session.get(f"{self.url_base}{path}", headers=headers, params=params, timeout=2)
+            res = self.session.get(f"{self.url_base}{path}", headers=headers, params=params, timeout=5)
             if res.status_code == 200 and res.json()['rt_cd'] == '0':
                 items = res.json().get('output', [])
                 if items:
@@ -497,8 +497,14 @@ class KoreaTrader(BaseTrader):
         msg += "=" * 35 + "\n"
 
         # 3. 보유 종목 리스팅
+        has_stock = False
         if details:
             for code, info in details.items():
+                # ✅ [수정] 수량이 0 이거나 음수인 종목(판 종목)은 리포트에서 제외!
+                if info['qty'] <= 0:
+                    continue
+
+                has_stock = True
                 # 목표 비중 찾기
                 target_ratio = 0
                 for t in targets:
@@ -523,6 +529,10 @@ class KoreaTrader(BaseTrader):
                 msg += f"   • 단가: {info['avg_price']:,.0f}원 → {info['current_price']:,.0f}원\n"
                 msg += f"   • 비중: {current_ratio:.1f}% (목표 {target_ratio_pct:.0f}%)\n"
                 msg += "-" * 35 + "\n"
+        
+        if not has_stock:
+            msg += "💤 현재 보유 중인 종목이 없습니다.\n"
+
         else:
             msg += "💤 보유 종목이 없습니다.\n"
         

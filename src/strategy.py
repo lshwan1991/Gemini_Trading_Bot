@@ -195,16 +195,36 @@ def strat_smart_momentum(curr, prev, setting):
     # 2. 타겟 가격 계산
     target_price = curr['Open'] + (curr['Range'] * k)
     current_price = curr['Close']
+    day_high = curr['High'] # 당일 고가 (실시간 갱신됨)
     
     # 3. 매수 조건 확인
     is_bull_market = current_price > curr['SMA20']
     volume_condition = curr['Volume'] > prev['Volume'] * 0.8
+    is_breakout = current_price > target_price
+
+    # (1) 고점 대비 하락폭 체크
+    # 목표가를 뚫고 한참 올라갔다가($110), 다시 내려오는 중($102)이라면 사지 마라!
+    # "현재가가 당일 고점의 98.1% 수준은 유지해야 한다" (1.9% 이상 밀리면 탈락)
+    threshold_ratio = 0.98
+    is_near_high = current_price >= (day_high * threshold_ratio)
+    
+    # (2) 꼬리 위험 감지
+    # 고점이 목표가보다 훨씬 높았는데(이미 시세 줌), 지금 가격이 내려왔다면 위험
+    is_falling_knife = (day_high > target_price * 1.02) and (current_price < day_high * 0.98)
     
     # -----------------------------------------------------------
     # 🟢 [매수 신호]
     # -----------------------------------------------------------
     if current_price > target_price and is_bull_market and volume_condition:
-        return 'buy', f"스마트_돌파(k={k:.2f},Vol_OK)", 0
+
+        # 🚨 필터링: 이미 고점 찍고 내려오는 놈이면 패스
+        if not is_near_high:
+            pct_drop = ((day_high - current_price) / day_high) * 100
+            return 'none', f"고점대비하락(-{pct_drop:.1f}%)", 0
+        if is_falling_knife:
+             return 'none', "하락반전_감지", 0
+
+        return 'buy', f"스마트_돌파(k={k:.2f}, Vol_OK+고점유지)", 0
 
     # -----------------------------------------------------------
     # 🔴 [매도 신호] (백테스트 최적화 적용)
@@ -212,10 +232,17 @@ def strat_smart_momentum(curr, prev, setting):
     
     # 1. RSI 과열 익절 (기준 85로 상향 -> 더 비쌀 때 팜)
     current_rsi = curr['RSI'] if 'RSI' in curr and not pd.isna(curr['RSI']) else 50
+
     if current_rsi > 85:
         return 'sell', f"RSI초과열({current_rsi:.0f})_익절", 0
     
-    # 2. 20일선 이탈 (Buffer 1% 적용 -> 휩소 방어)
+    # 2. ✅ [사용자 요청] 조건부 트레일링 스탑 (어깨에서 팔기)
+    # 조건: "RSI가 80 이상으로 뜨거운데" + "고점 대비 5% 꺾였다" -> 익절
+    if current_rsi >= 80:
+        if current_price < (day_high * 0.95):
+            return 'sell', f"고점(-5%)반납_익절(RSI {current_rsi:.0f})", 0
+    
+    # 3. 20일선 이탈 (Buffer 1% 적용 -> 휩소 방어)
     sma20_buffer = curr['SMA20'] * 0.99
     if current_price < sma20_buffer:
         return 'sell', "추세이탈(SMA20)_매도", 0

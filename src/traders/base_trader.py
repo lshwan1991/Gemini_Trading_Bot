@@ -112,23 +112,9 @@ class BaseTrader(ABC):
         # 5. 변동성 (Range)
         df['Range'] = df['High'].shift(1) - df['Low'].shift(1)
 
-        # ✅ [수정] A/D Line 직접 계산
-        # 고가-저가가 0인 경우(변동 없음) 1로 대체하여 에러 방지
-        hl_range = df['High'] - df['Low']
-        hl_range = hl_range.replace(0, 1) 
-        
-        mfm = ((df['Close'] - df['Low']) - (df['High'] - df['Close'])) / hl_range
-        mfv = mfm * df['Volume']
-        
-        # A/D Line = MFV의 누적 합계
-        df['AD'] = mfv.cumsum()
-        
-        # A/D Line의 20일 이동평균 (추세 판단용)
-        df['AD_MA20'] = df['AD'].rolling(window=20).mean()
-        
-        # NaN 값 처리 (앞쪽 데이터 채우기 + 0 처리)
-        df.bfill(inplace=True)
-        df.fillna(0, inplace=True)
+        # 5일치 최고가를 미리 계산해서 'High5'라는 이름으로 저장
+        df['High5'] = df['High'].rolling(window=5).max()
+        df['High5'] = df['High5'].fillna(df['High'])
 
         
         return df

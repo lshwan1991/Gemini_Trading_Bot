@@ -1,74 +1,137 @@
 [
     {
-        "code": "GOOG",
-        "name": "알파벳",
+        "code": "SPY",
+        "name": "미국대장(SPY)",
+        "market": "US",
+        "exchange": "AMEX",
+        "target_ratio": 0.10,
+        "strategy": "SMART_PRO",
+        "setting": { "level": 3, "market": "US" }
+    },
+    {
+        "code": "SOXX",
+        "name": "반도체정석",
+        "market": "US",
+        "exchange": "NASD",
+        "target_ratio": 0.10,
+        "strategy": "SMART_PRO",
+        "setting": { "level": 3, "market": "US" }
+    },
+    {
+        "code": "QQQ",
+        "name": "나스닥1배_상승",
         "market": "US",
         "exchange": "NASD",
         "target_ratio": 0.00,
-        "strategy": "SMART_MOMENTUM",
-        "setting": { 
-            "k": 0.5,
-            "market": "US"
-        }
+        "strategy": "SMART_PRO",
+        "setting": { "level": 3, "market": "US" }
+    },
+    {
+        "code": "BOTZ",
+        "name": "로봇AI(BOTZ)",
+        "market": "US",
+        "exchange": "NASD",
+        "target_ratio": 0.10,
+        "strategy": "SMART_PRO",
+        "setting": { "level": 3, "market": "US" }
+    },
+    {
+        "code": "XLE",
+        "name": "에너지",
+        "market": "US",
+        "exchange": "AMEX",
+        "target_ratio": 0.10,
+        "strategy": "SMART_PRO",
+        "setting": { "level": 3, "market": "US" }
+    },
+    {
+        "code": "GLD",
+        "name": "금",
+        "market": "US",
+        "exchange": "AMEX",
+        "target_ratio": 0.10,
+        "strategy": "SMART_PRO",
+        "setting": { "level": 3, "market": "US" }
     },
     {
         "code": "TQQQ",
         "name": "나스닥3배_상승",
         "market": "US",
         "exchange": "NASD",
-        "target_ratio": 0.10,
-        "strategy": "SMART_MOMENTUM",
-        "setting": { 
-            "k": 0.4,
-            "market": "US"
-        }
+        "target_ratio": 0.00,
+        "strategy": "SMART_PRO",
+        "setting": { "level": 4, "market": "US" }
     },
     {
         "code": "SQQQ",
         "name": "나스닥3배_하락(인버스)",
         "market": "US",
         "exchange": "NASD",
-        "target_ratio": 0.10,
-        "strategy": "SMART_MOMENTUM",
-        "setting": { 
-            "k": 0.4,
-            "market": "US"
-        }
+        "target_ratio": 0.00,
+        "strategy": "SMART_PRO",
+        "setting": { "level": 5, "market": "US" }
     },
     {
         "code": "SOXL",
         "name": "반도체3배_상승",
         "market": "US",
         "exchange": "AMEX",
-        "target_ratio": 0.10,
-        "strategy": "SMART_MOMENTUM",
-        "setting": { 
-            "k": 0.4,
-            "market": "US"
-        }
+        "target_ratio": 0.00,
+        "strategy": "SMART_PRO",
+        "setting": { "level": 4, "market": "US" }
     },
     {
         "code": "SOXS",
         "name": "반도체3배_하락(인버스)",
         "market": "US",
         "exchange": "AMEX",
-        "target_ratio": 0.10,
-        "strategy": "SMART_MOMENTUM",
-        "setting": { 
-            "k": 0.4,
-            "market": "US"
-        }
+        "target_ratio": 0.00,
+        "strategy": "SMART_PRO",
+        "setting": { "level": 5, "market": "US" }
+    },
+    {
+        "code": "GOOG",
+        "name": "알파벳",
+        "market": "US",
+        "exchange": "NASD",
+        "target_ratio": 0.00,
+        "strategy": "SMART_PRO",
+        "setting": { "level": 3, "market": "US" }
     },
     {
         "code": "TSLA",
-        "name": "테슬라",
+        "name": "테슬라(로봇, 전치차 등)",
         "market": "US",
         "exchange": "NASD",
-        "target_ratio": 0.20,
-        "strategy": "SMART_MOMENTUM",
-        "setting": { 
-            "k": 0.5,
-            "market": "US"
-        }
+        "target_ratio": 0.0,
+        "strategy": "SMART_PRO",
+        "setting": { "level": 3, "market": "US" }
+    },
+    {
+        "code": "ISRG",
+        "name": "인튜이티브 서지컬(의료 로봇)",
+        "market": "US",
+        "exchange": "NASD",
+        "target_ratio": 0.10,
+        "strategy": "SMART_PRO",
+        "setting": { "level": 3, "market": "US" }
+    },
+    {
+        "code": "SYM",
+        "name": "심보틱(물류 자동화 로봇)",
+        "market": "US",
+        "exchange": "NASD",
+        "target_ratio": 0.00,
+        "strategy": "SMART_PRO",
+        "setting": { "level": 4, "market": "US" }
+    },
+    {
+        "code": "NEXM",
+        "name": "넥스메탈스 마이닝",
+        "market": "US",
+        "exchange": "NASD",
+        "target_ratio": 0.10,
+        "strategy": "SMART_PRO",
+        "setting": { "level": 5, "market": "US" }
     }
 ]

@@ -573,6 +573,38 @@ class KoreaTrader(BaseTrader):
         # 2. 대기 주문 정리 (타임아웃 시 취소)
         self.clean_pending_orders(holdings)
 
+        # ==================================================================
+        # 🛑 [NEW] 과매수 방지 로직 (목표 달성 시 미체결 매수 취소)
+        # ==================================================================
+        for t in targets:
+            code = t['code']
+            target_ratio = t.get('target_ratio', 0)
+            target_amt = total_asset * target_ratio # 목표 금액
+            
+            # 현재 보유 평가액
+            current_amt = details.get(code, {}).get('eval_amt', 0)
+            
+            # 대기 중인 매수 주문 찾기
+            pending_buys = [o for o in self.pending_orders if o['code'] == code and o['type'] == 'BUY']
+            
+            if pending_buys:
+                pending_amt = sum(o.get('amt', 0) for o in pending_buys)
+                
+                # (보유액 + 대기액)이 목표액을 10% 초과하면 -> 대기 주문 취소!
+                if (current_amt + pending_amt) > (target_amt * 1.1):
+                    print(f"   🚨 [Overbuy Guard] {t['name']} 목표 비중 충족 예상 -> 미체결 매수 취소")
+                    
+                    # 대기 중인 주문들 취소 실행
+                    for order in pending_buys:
+                        if 'odno' in order:
+                            self.cancel_order(order['odno'], code, 0) # 0: 전량 취소
+                            send_telegram_msg(f"🛡️ [과매수 방지] {t['name']} 미체결 취소 (목표 달성)")
+                    
+                    # 큐 정리
+                    self.pending_orders = [o for o in self.pending_orders if o not in pending_buys]
+                    time.sleep(0.5)
+        # ==================================================================
+
         # 3. Cleanup
         current_time = time.time()
         target_codes = set([t['code'] for t in targets])
@@ -701,7 +733,7 @@ class KoreaTrader(BaseTrader):
                     
                     elif odno:
                         self.save_trade_log("Buy", name, current_price, qty, reason)
-                        send_telegram_msg(f"🚀 [매수 체결] {name} {qty}주 (@ {current_price:,}원)")
+                        send_telegram_msg(f"🚀 [매수 체결] {name} {qty}주 (@ {current_price:,}원), 이유 {reason}")
                         # ✅ odno 추가 저장
                         self.pending_orders.append({'code': code, 'type': 'BUY', 'time': time.time(), 'amt': qty*current_price, 'odno': odno})
                         total_cash -= (qty * current_price)
@@ -719,7 +751,7 @@ class KoreaTrader(BaseTrader):
                 
                 elif odno:
                     self.save_trade_log("Sell", name, current_price, qty_held, reason)
-                    send_telegram_msg(f"💧 [매도 체결] {name} {qty_held}주 (전량)")
+                    send_telegram_msg(f"💧 [매도 체결] {name} {qty_held}주 (전량), 이유 {reason}")
                     self.pending_orders.append({'code': code, 'type': 'SELL', 'time': time.time(), 'amt': 0, 'odno': odno})
                     total_cash += (qty_held * current_price)
                     investable_cash += (qty_held * current_price)

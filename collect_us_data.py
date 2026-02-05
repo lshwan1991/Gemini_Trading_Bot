@@ -8,12 +8,15 @@ from datetime import datetime, timedelta
 # ==========================================
 # 미국은 종목코드 대신 '티커(Ticker)'를 사용합니다.
 targets = [
+    {"code": "AMZN", "name": "아마존", "type": "STOCK"},
+    {"code": "SYM", "name": "심보틱", "type": "STOCK"},
+    {"code": "ISRG", "name": "인튜이티브 서지컬", "type": "STOCK"},
+    {"code": "TSLA", "name": "테슬라", "type": "STOCK"},
+    {"code": "GOOG", "name": "구글", "type": "STOCK"},
+    {"code": "TQQQ", "name": "나스닥3배", "type": "ETF"},
+    {"code": "SQQQ", "name": "나스닥3배_인버스", "type": "ETF"},
     {"code": "SOXS", "name": "반도체3배_인버스", "type": "ETF"},
-    #{"code": "SOXL", "name": "반도체3배_Direxion", "type": "ETF"},
-    #{"code": "TSLA", "name": "테슬라", "type": "STOCK"},
-    #{"code": "GOOG", "name": "구글", "type": "STOCK"},
-    #{"code": "SQQQ", "name": "나스닥3배_인버스", "type": "ETF"},
-    #{"code": "SPY",  "name": "S&P500", "type": "ETF"},
+    {"code": "SOXL",  "name": "반도체3배", "type": "ETF"}
 ]
 
 # 기간 설정 (최근 2년 + 여유분)

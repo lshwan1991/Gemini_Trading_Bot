@@ -60,6 +60,7 @@ class MainController:
             #return "IDLE"
             return "KR_ACTIVE"
         
+        # 🇺🇸 미국장: 23:30 ~ 06:00 (서머타임 고려 시 22:30~05:00 등 유동적이나 넓게 잡음)
         if 2330 <= hm <= 2400 or 0 <= hm <= 600:
             return "US_ACTIVE"
 
@@ -67,8 +68,8 @@ class MainController:
         #return "KR_ACTIVE"
 
     def run(self):
-        print("🚀 [System] 하이브리드 트레이딩 봇 가동 (KR:Paper / US:Real)")
-        send_telegram_msg("🤖 하이브리드 봇 실행 (KR:모의 / US:실전)")
+        print("🚀 [System] 하이브리드 트레이딩 봇 가동 (KR:Real / US:Real)")
+        send_telegram_msg("🤖 하이브리드 봇 실행 (KR:실전 / US:실전)")
 
         last_kr_msg_time = 0
         last_us_msg_time = 0
@@ -83,15 +84,19 @@ class MainController:
                 # 평일 확인 (월~금)
                 is_weekday = weekday < 5
 
-                # 🔄 [리셋] 날짜가 바뀌면 휴장일 플래그 초기화 (새로운 날이니까 다시 시도)
+                # 1. 날짜가 바뀌면 (00:00) -> 한국장 플래그 리셋
                 if today_str != self.last_date:
                     if self.is_kr_holiday:
                         print(f"📅 [System] 날짜 변경! KR 휴장 플래그 해제")
                         self.is_kr_holiday = False
-                    if self.is_us_holiday:
-                        print(f"📅 [System] 날짜 변경! US 휴장 플래그 해제")
-                        self.is_us_holiday = False
                     self.last_date = today_str
+
+                # 2. 오후 1시 (13:00) -> 미국장 플래그 리셋 (핵심 ⭐)
+                # (새벽에 휴장 감지된 것이 오늘 밤 매매를 막지 않도록 오후에 풀어줌)
+                if 1300 <= hm < 1305 and self.is_us_holiday:
+                    print(f"📅 [System] 오후 1시 경과 -> US 휴장 플래그 해제 (오늘 밤장 준비)")
+                    self.is_us_holiday = False
+                    send_telegram_msg("🇺🇸 [System] 미국장 휴장 모드 해제 (오늘 밤 매매 준비)")
                 
                 # ==========================================
                 # 🌅 [한국장] 장 시작 전 목표 보고 (08:30 ~ 08:59)
@@ -158,6 +163,7 @@ class MainController:
                     else:
                         # 휴장일이면 그냥 대기 (API 호출 안 함)
                         print(f"\r⛔ [KR] 휴장일 대기 중... ({now.strftime('%H:%M:%S')})", end='')
+                        time.sleep(60)
 
                     if time.time() - last_kr_msg_time >= 10800:
                         print(f"⏰ [알림] 3시간 정기 포트폴리오 보고 전송 중... ({now.strftime('%H:%M:%S')})")
@@ -167,18 +173,23 @@ class MainController:
                     if not self.is_kr_holiday:
                         print(f"\r [KR] 모니터링 중... ({now.strftime('%H:%M:%S')})", end='')
                         time.sleep(3)
+                        
                     else:
                         time.sleep(60) # 휴장일엔 1분 대기
                 
                 elif status == "US_ACTIVE":
                     if not self.is_us_holiday:
                         result = self.us_trader.run()
+
                         if result == "HOLIDAY":
                             print(f"⛔ [Circuit Breaker] 미국장 휴장일 감지 -> 오늘 US 트레이딩 종료")
                             self.is_us_holiday = True
                             send_telegram_msg("⛔ [미국장] 휴장일 감지! 오늘 매매를 종료합니다.")
+
+                        time.sleep(1)
                     else:
                         print(f"\r⛔ [US] 휴장일 대기 중... ({now.strftime('%H:%M:%S')})", end='')
+                        time.sleep(60)
 
                     # 미국장 생존신고 로직 추가 (미국 타이머 last_us_msg_time 사용)
                     if time.time() - last_us_msg_time >= 10800:

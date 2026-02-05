@@ -408,23 +408,33 @@ class KoreaTrader(BaseTrader):
     # [Report] 리포트 관련
     # ==================================================================
     def report_targets(self):
-        """장 시작 전 목표 보고"""
+        """장 시작 전 목표 보고 (비중 0% 제외)"""
         targets = load_target_stocks("KR")
         if not targets: return "❌ [Error] 타겟 파일 로드 실패"
+        
+        # 전체 목표 비중 계산
         total_ratio = sum(t.get('target_ratio', 0) for t in targets)
+        
         msg = f"☀️ **[오늘의 목표 포트폴리오 (KR)]**\n🎯 목표 비중: {total_ratio*100:.1f}%\n\n"
-        for t in targets:
-            msg += f"🔹 {t['name']} ({t['code']}): {t.get('target_ratio',0)*100:.1f}%\n"
+        
+        # 🚨 [수정] 비중이 0보다 큰 것만 리스트에 담아서 출력
+        valid_targets = [t for t in targets if t.get('target_ratio', 0) > 0]
+        
+        if valid_targets:
+            for t in valid_targets:
+                msg += f"🔹 {t['name']} ({t['code']}): {t.get('target_ratio',0)*100:.1f}%\n"
+        else:
+            msg += "   (매수 목표 종목 없음)\n"
+            
         return msg
     
     def report_balance(self):
-        """장 마감 후 결산 보고 (통합 API 데이터 활용)"""
+        """장 마감 후 결산 보고 (수익률 순 정렬 적용)"""
         self.refresh_token()
         total_asset, total_cash, holdings, details, balance_summary = self.get_balance()
         
         realized = balance_summary.get('realized_profit', 0)
         eval_profit = balance_summary.get('eval_profit', 0) 
-        # 오늘 총 수익 = 실현손익 + 평가손익 (자산증감액과 유사)
         today_profit = realized + eval_profit
         
         msg = "🌙 **[장 마감 결산 보고 (KR)]**\n"
@@ -437,39 +447,49 @@ class KoreaTrader(BaseTrader):
         msg += "-" * 28 + "\n"
         
         if details:
-            msg += "**[종목별 상세]**\n"
-            has_holding = False
-
+            msg += "**[종목별 상세 (수익률 순)]**\n"
+            
+            # 1. 보유 중인 종목만 추려서 리스트 생성
+            holding_list = []
             for code, info in details.items():
-                qty = info['qty']
-                if qty > 0:
-                    has_holding = True
-                    # 비중 계산
-                    weight = (info['eval_amt'] / total_asset) * 100
-                    
+                if info['qty'] > 0:
+                    # 비중 계산 미리 수행
+                    info['weight'] = (info['eval_amt'] / total_asset) * 100
+                    info['code'] = code # 코드 정보도 딕셔너리에 넣음
+                    holding_list.append(info)
+
+            # 🚨 [수정] 수익률(profit_rate) 높은 순서대로 정렬 (내림차순)
+            holding_list.sort(key=lambda x: x['profit_rate'], reverse=True)
+
+            if holding_list:
+                for info in holding_list:
                     # 수익/손실 아이콘
                     icon = "🔴" if info['profit_rate'] > 0 else "🔵"
                     
-                    # 상세 정보 출력
-                    msg += f"{icon} **{info['name']}** ({code})\n"
+                    msg += f"{icon} **{info['name']}** ({info['code']})\n"
                     msg += f"   • 수익: {info.get('profit_amt', 0):+,.0f}원 ({info['profit_rate']:+.2f}%)\n"
                     msg += f"   • 단가: {info['avg_price']:,.0f}원 → {info['current_price']:,.0f}원\n"
-                    msg += f"   • 비중: {weight:.1f}% (평가 {info['eval_amt']:,.0f}원)\n"
+                    msg += f"   • 비중: {info['weight']:.1f}% (평가 {info['eval_amt']:,.0f}원)\n"
                     
-                    # 당일 매수매도로 실현 손익이 섞여 있는 경우 표시
                     if info.get('realized_pl', 0) != 0:
                         msg += f"   • 금일실현: {info['realized_pl']:+,.0f}원\n"
-                    
-                    msg += "\n" # 가독성을 위한 줄바꿈
-            if not has_holding:
+                    msg += "\n"
+            else:
                 msg += "   (보유 종목 없음)\n\n"
 
             # (2) 오늘 전량 매도한 종목 (잔고 0이지만 실현손익 있음)
             sold_stocks_msg = ""
+            # 매도한 종목도 리스트로 만들어서 정렬 가능 (여기서는 확정수익 순으로 정렬해봄)
+            sold_list = []
             for code, info in details.items():
                 if info['qty'] == 0 and info.get('realized_pl', 0) != 0:
-                    sold_stocks_msg += f"🔻 **{info['name']}** (전량매도)\n"
-                    sold_stocks_msg += f"   💸 확정수익: {info['realized_pl']:+,.0f}원\n"
+                    sold_list.append(info)
+            
+            sold_list.sort(key=lambda x: x['realized_pl'], reverse=True)
+
+            for info in sold_list:
+                sold_stocks_msg += f"🔻 **{info['name']}** (전량매도)\n"
+                sold_stocks_msg += f"   💸 확정수익: {info['realized_pl']:+,.0f}원\n"
             
             if sold_stocks_msg:
                 msg += "-" * 28 + "\n"
@@ -482,73 +502,82 @@ class KoreaTrader(BaseTrader):
         return msg
     
     def report_portfolio_status(self):
-        """3시간 주기 리포트"""
+        """3시간 주기 리포트 (수익률 순 정렬)"""
         total_asset, total_cash, holdings, details, _ = self.get_balance()
         if total_asset == 0:
             print("⚠️ [Skip] 자산 조회 실패로 리포트 전송 생략")
             return
         
+        # 타겟 정보를 딕셔너리로 변환 (검색 속도 향상)
         targets = load_target_stocks("KR")
-        if not targets: return
+        target_map = {t['code']: t['target_ratio'] for t in targets} if targets else {}
 
         msg = f"📊 **[중간 점검 (KR)]**\n"
         msg += f"💰 총 자산: {total_asset:,.0f}원\n"
         msg += f"💵 예수금: {total_cash:,.0f}원 (현금비중 {total_cash/total_asset*100:.1f}%)\n"
         msg += "=" * 35 + "\n"
 
-        # 3. 보유 종목 리스팅
-        has_stock = False
+        # 🚨 [수정] 정렬을 위한 리스트 생성
+        active_stocks = []
         if details:
             for code, info in details.items():
-                # ✅ [수정] 수량이 0 이거나 음수인 종목(판 종목)은 리포트에서 제외!
-                if info['qty'] <= 0:
-                    continue
+                if info['qty'] <= 0: continue # 판 종목 제외
+                
+                # 정보 추가
+                info['code'] = code
+                info['target_ratio'] = target_map.get(code, 0)
+                info['current_ratio'] = (info['eval_amt'] / total_asset) * 100
+                active_stocks.append(info)
 
-                has_stock = True
-                # 목표 비중 찾기
-                target_ratio = 0
-                for t in targets:
-                    if t['code'] == code:
-                        target_ratio = t['target_ratio']
-                        break
+        # 🚨 [수정] 수익률 높은 순서대로 정렬
+        active_stocks.sort(key=lambda x: x['profit_rate'], reverse=True)
+
+        if active_stocks:
+            for info in active_stocks:
+                target_ratio_pct = info['target_ratio'] * 100
                 
-                # 현재 비중 계산
-                current_ratio = (info['eval_amt'] / total_asset) * 100
-                target_ratio_pct = target_ratio * 100
-                
-                # 수익/손실 아이콘
+                # 아이콘 설정
                 icon = "🔴" if info['profit_rate'] > 0 else "🔵"
-                
-                # 메시지 포맷팅 (사용자 요청 반영)
-                # 이름(코드)
-                # 수익률 | 평가금액
-                # 평단가 -> 현재가
-                # 비중 (목표)
-                msg += f"{icon} **{info['name']}** ({code})\n"
+                if info['profit_rate'] == 0: icon = "⚪"
+
+                msg += f"{icon} **{info['name']}** ({info['code']})\n"
                 msg += f"   • 수익: {info['profit_rate']:+.2f}%  |  {info['eval_amt']:,.0f}원\n"
                 msg += f"   • 단가: {info['avg_price']:,.0f}원 → {info['current_price']:,.0f}원\n"
-                msg += f"   • 비중: {current_ratio:.1f}% (목표 {target_ratio_pct:.0f}%)\n"
+                msg += f"   • 비중: {info['current_ratio']:.1f}% (목표 {target_ratio_pct:.0f}%)\n"
                 msg += "-" * 35 + "\n"
-        
-        if not has_stock:
-            msg += "💤 현재 보유 중인 종목이 없습니다.\n"
-
         else:
-            msg += "💤 보유 종목이 없습니다.\n"
+            msg += "💤 현재 보유 중인 종목이 없습니다.\n"
         
         # 4. 전송
         send_telegram_msg(msg)
     
     def print_portfolio_status(self, total_asset, total_cash, details, targets):
+        """콘솔 출력용 (수익률 순 정렬)"""
         print(f"\n📊 [Portfolio Status] 자산: {total_asset:,.0f}원 | 현금: {total_cash:,.0f}원")
-        if not details: print("   보유 종목 없음")
-        else:
+        
+        if not details: 
+            print("   보유 종목 없음")
+            return
+
+        # 🚨 [수정] 출력용 리스트 생성 및 정렬
+        print_list = []
+        for code, info in details.items():
+            if info['qty'] > 0:
+                target_r = next((t['target_ratio'] for t in targets if t['code'] == code), 0) * 100
+                info['target_r_pct'] = target_r
+                info['real_ratio'] = (info['eval_amt'] / total_asset) * 100
+                print_list.append(info)
+        
+        # 수익률 높은 순 정렬
+        print_list.sort(key=lambda x: x['profit_rate'], reverse=True)
+
+        if print_list:
             print(f"   {'종목명':<10} | {'수익률':^8} | {'평가금액':^12} | {'비중':^6}")
             print("-" * 50)
-            for code, info in details.items():
-                if info['qty'] > 0:
-                    target_r = next((t['target_ratio'] for t in targets if t['code'] == code), 0) * 100
-                    print(f"   {info['name']:<10} | {info['profit_rate']:>6.2f}% | {info['eval_amt']:>11,.0f}원 | {(info['eval_amt']/total_asset)*100:>5.1f}% (목{target_r:.0f}%)")
+            for info in print_list:
+                print(f"   {info['name']:<10} | {info['profit_rate']:>6.2f}% | {info['eval_amt']:>11,.0f}원 | {info['real_ratio']:>5.1f}% (목{info['target_r_pct']:.0f}%)")
+        else:
+            print("   보유 종목 없음 (전량 매도 상태)")
         print("-" * 50)
 
     # ==================================================================

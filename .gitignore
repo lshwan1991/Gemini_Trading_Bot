@@ -10,6 +10,12 @@ token_real.json
 token_paper.json
 .csv
 data/
+auth.json
+config.py
+key.txt
+trade_history.json
+profit_status.json
+telegram_bot.log
 
 # 의존성 폴더 (용량 큼)
 node_modules/
@@ -21,6 +27,8 @@ venv/
 .vscode/
 .idea/
 .__pycache__/
+*.pyc
+__pycache__/
 
 # 빌드 결과물 및 로그
 dist/
